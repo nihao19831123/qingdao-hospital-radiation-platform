@@ -56,7 +56,12 @@ select.btn{padding:4px 6px}
 <div id="main">
   <div id="chartWrap"><div id="chart"></div></div>
   <div id="side">
-    <h3>患者来源 TOP10（当前筛选）</h3>
+    <div id="aiInsightHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <h3 style="margin:0;border:none;padding:0">🤖 AI 智能洞察</h3>
+      <span id="aiInsightCount" class="btn" style="font-size:11px;padding:2px 8px;cursor:default">加载中…</span>
+    </div>
+    <div id="aiInsightBox"></div>
+    <h3 style="margin-top:14px">患者来源 TOP10（当前筛选）</h3>
     <div id="top10"></div>
     <h3 style="margin-top:16px">医疗辐射半径（本院）</h3>
     <div id="radiusBox">
@@ -77,6 +82,13 @@ select.btn{padding:4px 6px}
   </div>
 </div>
 <div id="note">双击地图复位视图</div>
+<div id="insightOverlay" style="display:none;position:fixed;inset:0;z-index:40;background:rgba(10,12,18,.92)">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 28px 0">
+    <h2 style="margin:0;font-size:16px;color:#7db9ff">🧠 智能原因分析</h2>
+    <span id="insightClose" class="btn" style="padding:5px 16px">✕ 关闭</span>
+  </div>
+  <div id="insightBody" style="position:absolute;top:70px;left:28px;right:28px;bottom:24px;overflow-y:auto;padding-right:8px"></div>
+</div>
 <div id="quadOverlay" style="display:none;position:fixed;inset:0;z-index:30;background:rgba(10,12,18,.92)">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px 0">
     <h2 style="margin:0;font-size:16px;color:#7db9ff">四象限潜力分析 — 人口增长 × 患者增长（点击气泡定位到地图）</h2>
@@ -410,9 +422,73 @@ var DATA = {"years": [2020, 2021, 2022, 2023, 2024, 2025, 2026], "population": {
     });
   }
 
+  // ============ 🤖 AI 智能洞察 (巡检引擎前端) ============
+  var insightItems = [];
+  function loadInsights(){
+    var box = document.getElementById('aiInsightBox');
+    var cnt = document.getElementById('aiInsightCount');
+    fetch('/api/inspect').then(function(r){ return r.json(); }).then(function(d){
+      insightItems = d.items || [];
+      cnt.textContent = '本期发现 ' + d.count + ' 项';
+      cnt.style.background = '#2563eb'; cnt.style.borderColor = '#2563eb'; cnt.style.color = '#fff';
+      renderInsights();
+    }).catch(function(){
+      cnt.textContent = '未连接引擎';
+      box.innerHTML = '<div class="ai-item" style="border-left-color:#e67e22">⚠️ 请启动后端服务后访问：<br/><b>python backend/app.py</b> → http://localhost:8000</div>';
+    });
+  }
+  function levelLabel(e){
+    return {'异常增长':'🔴 异常增长','异常下降':'🔴 异常下降','覆盖不足':'🟠 覆盖不足','专科优势':'🟢 专科优势'}[e.type] || e.type;
+  }
+  function eventDesc(e){
+    if(e.type === '异常增长') return e.street + ' 患者同比 <b>+' + e.pat_rate + '%</b>（+' + e.pat_chg + '人次），HRI ' + e.hri24 + '→' + e.hri25;
+    if(e.type === '异常下降') return e.street + ' 患者同比 <b>' + e.pat_rate + '%</b>（' + e.pat_chg + '人次），HRI ' + e.hri24 + '→' + e.hri25;
+    if(e.type === '覆盖不足') return e.street + ' 人口增长<b>+' + e.pop_growth + '%</b>，患者仅 ' + (e.pat_rate >= 0 ? '+' : '') + e.pat_rate + '%，覆盖增长不足';
+    if(e.type === '专科优势') return e.street + ' 「' + e.dept + '」占<b>' + e.dept_share + '%</b>（全院 ' + e.all_share + '%），形成专科优势';
+    return e.street;
+  }
+  function renderInsights(){
+    var box = document.getElementById('aiInsightBox');
+    box.innerHTML = insightItems.map(function(it, i){
+      var e = it.event;
+      var border = e.level === 'red' ? '#e74c3c' : (e.level === 'orange' ? '#e67e22' : '#27ae60');
+      return '<div class="ai-item" style="border-left-color:' + border + '">' +
+        '<div style="font-weight:bold;font-size:12.5px">' + levelLabel(e) + '</div>' +
+        '<div style="margin:4px 0 6px;line-height:1.5">' + eventDesc(e) + '</div>' +
+        '<span class="btn" style="font-size:11px;padding:2px 10px" onclick="window.__openInsight(' + i + ')">🔍 查看原因</span>' +
+        '</div>';
+    }).join('');
+  }
+  window.__openInsight = function(i){
+    var it = insightItems[i];
+    if(!it) return;
+    var e = it.event, att = it.attribution, exp = it.explain;
+    // 地图定位
+    var c = DATA.coords[e.street];
+    if(c){ chart.setOption({geo:{center:[c.lng, c.lat], zoom:9}}); }
+    chart.dispatchAction({type:'highlight', seriesIndex:0, name:e.street});
+    // 弹窗内容
+    var deptBars = att.dept_contrib.slice(0,5).map(function(d){
+      return '<div class="band-row"><span class="band-name" style="width:64px">' + d.dept + '</span><div class="band-bar"><div class="band-fill" style="width:' + d.pct * 2.2 + '%;background:#e67e22"></div></div><span class="band-pct" style="width:52px">' + d.pct + '%</span></div>';
+    }).join('');
+    var ov = document.getElementById('insightOverlay');
+    document.getElementById('insightBody').innerHTML =
+      '<div class="ai-item" style="border-left-color:#7db9ff">📍 <b>' + e.district + '「' + e.street + '」</b> — ' + levelLabel(e) + '（异常分 ' + e.score + '）</div>' +
+      '<div style="margin-top:14px;font-size:13px;color:#7db9ff;font-weight:bold">① 异常现象</div>' +
+      '<div class="ai-item">' + eventDesc(e) + '<br/>每万人就诊变化：' + (e.vpr_rate != null ? (e.vpr_rate >= 0 ? '+' : '') + e.vpr_rate + '%' : '—') + ' ｜ 患者总量变化：' + (e.pat_chg >= 0 ? '+' : '') + e.pat_chg + ' 人次</div>' +
+      '<div style="margin-top:14px;font-size:13px;color:#7db9ff;font-weight:bold">② 原因归因（科室贡献度）</div>' +
+      '<div style="background:#20242f;border-radius:6px;padding:10px 12px">' + (deptBars || '<div style="color:#888;font-size:12px">无科室数据</div>') + '</div>' +
+      '<div style="margin-top:8px;font-size:12px;color:#9ca3af">门诊贡献约 <b style="color:#eee">' + att.visit_contrib.opd_pct + '%</b> ｜ 住院贡献约 <b style="color:#eee">' + att.visit_contrib.ipd_pct + '%</b></div>' +
+      '<div style="margin-top:14px;font-size:13px;color:#7db9ff;font-weight:bold">③ AI 智能分析（' + (exp.source === 'deepseek' ? 'DeepSeek 大模型' : '规则引擎') + '）</div>' +
+      '<div class="ai-item good">' + exp.text + '</div>';
+    ov.style.display = 'block';
+  };
+  document.getElementById('insightClose').onclick = function(){ document.getElementById('insightOverlay').style.display = 'none'; };
+
   chart.on('dblclick', function(){ chart.dispatchAction({type:'restore'}); });
   window.addEventListener('resize', function(){ chart.resize(); if(rTrendChart) rTrendChart.resize(); });
   render();
   renderRadius();
+  loadInsights();
 })();
 </script></body></html>
