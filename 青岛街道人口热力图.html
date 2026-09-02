@@ -23,7 +23,11 @@ select.btn{padding:4px 6px}
   padding:7px 16px;border-radius:6px;display:none;font-size:12.5px}
 .top10-item{display:flex;align-items:center;gap:8px;font-size:12px;margin:4px 0}
 .dist-label{font-size:13px;color:#8ec5ff;text-shadow:0 0 8px rgba(80,160,255,.7),0 1px 3px #000;font-weight:bold;letter-spacing:2px;pointer-events:none;white-space:nowrap}
+.hos-label{font-size:10.5px;color:#ffb4b4;background:rgba(5,11,24,.75);border:1px solid rgba(255,80,80,.35);border-radius:4px;padding:1px 6px;white-space:nowrap;pointer-events:none;text-shadow:0 1px 2px #000}
 .main-label{font-size:12.5px;color:#ffd700;background:rgba(5,11,24,.8);border:1px solid rgba(255,215,0,.5);border-radius:5px;padding:3px 8px;font-weight:bold;white-space:nowrap;pointer-events:none;box-shadow:0 0 12px rgba(255,215,0,.35)}
+.maplibregl-popup-content{background:rgba(8,16,32,.92)!important;color:#cbd5e1;border:1px solid rgba(80,140,255,.35);border-radius:8px;padding:10px 12px;box-shadow:0 4px 20px rgba(0,0,0,.5);backdrop-filter:blur(8px);font-size:12px}
+.maplibregl-popup-tip{border-top-color:rgba(8,16,32,.92)!important;border-bottom-color:rgba(8,16,32,.92)!important}
+.maplibregl-popup-close-button{color:#8ec5ff;font-size:16px}
 .top10-bar{height:12px;border-radius:3px;background:linear-gradient(90deg,#2563eb,#3fa7d6)}
 .top10-name{width:70px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ai-item{font-size:12px;line-height:1.7;color:#cbd5e1;padding:7px 9px;margin:6px 0;background:#20242f;border-left:3px solid #3fa7d6;border-radius:3px}
@@ -194,7 +198,7 @@ var DATA = {"years": [2020, 2021, 2022, 2023, 2024, 2025, 2026], "population": {
     }
     // 医院点
     var hosFeats = M.hospitals.map(function(h){
-      return {type:'Feature', properties:{r: h.is_main?16:8, c: h.is_main?'#ffd700':'#e74c3c', name:h.name, grade:h.grade, opd:h.opd, ipd:h.ipd, main:!!h.is_main},
+      return {type:'Feature', properties:{r: h.is_main?18:10, sw: h.is_main?3:1.5, c: h.is_main?'#ffd700':'#ff4d4d', name:h.name, grade:h.grade, opd:h.opd, ipd:h.ipd, main:!!h.is_main},
         geometry:{type:'Point', coordinates:[h.lng, h.lat]}};
     });
     map.getSource('hospitals').setData({type:'FeatureCollection', features: hosFeats});
@@ -237,7 +241,8 @@ var DATA = {"years": [2020, 2021, 2022, 2023, 2024, 2025, 2026], "population": {
         map.addLayer({id:'flow-line', type:'line', source:'flow',
           paint:{'line-color':'#ffd76a', 'line-width':['get','w'], 'line-opacity':0.45}});
         map.addLayer({id:'hospitals', type:'circle', source:'hospitals',
-          paint:{'circle-radius':['get','r'], 'circle-color':['get','c'], 'circle-blur':0.35, 'circle-opacity':0.95}});
+          paint:{'circle-radius':['get','r'], 'circle-color':['get','c'], 'circle-blur':0.3, 'circle-opacity':0.95,
+                 'circle-stroke-color':'#ffffff', 'circle-stroke-width':['get','sw'], 'circle-stroke-opacity':0.9}});
         // 区县名 div 标注 (bbox 中心, 不依赖字体服务)
         M.districts.features.forEach(function(f){
           var name = f.properties.name;
@@ -251,30 +256,58 @@ var DATA = {"years": [2020, 2021, 2022, 2023, 2024, 2025, 2026], "population": {
           el.textContent = name;
           new maplibregl.Marker({element: el}).setLngLat([cx, cy]).addTo(map);
         });
-        // 本院名称标注
+        // 医院名称标注: 本院 + 周边10km内
         var mainH = M.hospitals.find(function(h){ return h.is_main; });
-        if(mainH){
-          var el2 = document.createElement('div');
-          el2.className = 'main-label';
-          el2.textContent = '🏥 青岛市第三人民医院 ★本院';
-          new maplibregl.Marker({element: el2}).setLngLat([mainH.lng, mainH.lat]).addTo(map);
-        }
+        var km = function(h){
+          var dLat = (h.lat - mainH.lat) * 111;
+          var dLng = (h.lng - mainH.lng) * 89.6;
+          return Math.sqrt(dLat * dLat + dLng * dLng);
+        };
+        M.hospitals.forEach(function(h){
+          if(h.is_main){
+            var el2 = document.createElement('div');
+            el2.className = 'main-label';
+            el2.textContent = '🏥 青岛市第三人民医院 ★本院';
+            new maplibregl.Marker({element: el2}).setLngLat([h.lng, h.lat]).addTo(map);
+          } else if(mainH && km(h) <= 10){
+            var el3 = document.createElement('div');
+            el3.className = 'hos-label';
+            el3.textContent = h.name.replace(/青岛大学附属医院|青岛市|山东大学|山东第一医科大学附属|解放军第|医院|集团|院区|康复大学附属/g,'');
+            new maplibregl.Marker({element: el3}).setLngLat([h.lng, h.lat]).addTo(map);
+          }
+        });
+        var hoverPopup = null;
         map.on('mousemove', function(e){
-          var f = map.queryRenderedFeatures(e.point, {layers:['streets-3d']});
+          var f = map.queryRenderedFeatures(e.point, {layers:['streets-3d','hospitals']});
           var el = document.getElementById('chart');
           if(f.length){
             el.style.cursor = 'pointer';
+            var layer = f[0].layer.id;
+            if(layer === 'hospitals'){
+              var hp = f[0].properties;
+              var dis = hp.diseases ? hp.diseases.slice(0,3).map(function(x){return x.name+' '+x.pct+'%';}).join('<br/>') : '';
+              var html = '<b>' + hp.name + (hp.main?'（本院）':'') + '</b><br/>等级：' + hp.grade + '<br/>年门诊量：<b>' + Number(hp.opd).toLocaleString() + '</b> 人次<br/>年住院量：<b>' + Number(hp.ipd).toLocaleString() + '</b> 人次' + (dis ? '<hr style="margin:4px 0"/>主要病种：<br/>' + dis : '');
+              if(hoverPopup){
+                hoverPopup.setLngLat(e.lngLat).setHTML(html);
+              } else {
+                hoverPopup = new maplibregl.Popup({closeButton:false, offset:[0,-20]}).setLngLat(e.lngLat).setHTML(html).addTo(map);
+              }
+              return;
+            }
             var props = f[0].properties;
-            map.getCanvas().style.cursor = 'pointer';
             var sd = streetData().find(function(x){ return x.name === props.name; });
             var v = sd && sd.v != null ? sd.v : null;
-            new maplibregl.Popup({closeButton:false, offset:[0,-30], className:'glass-popup'})
-              .setLngLat(e.lngLat)
-              .setHTML('<b>'+props.name+'</b><br/>'+(props.district||'')+'<br/>'+metricName[curMetric]+': <b>'+(v!=null?Number(v).toLocaleString():'—')+'</b>')
-              .addTo(map);
+            if(hoverPopup){
+              hoverPopup.setLngLat(e.lngLat).setHTML('<b>'+props.name+'</b><br/>'+(props.district||'')+'<br/>'+metricName[curMetric]+': <b>'+(v!=null?Number(v).toLocaleString():'—')+'</b>');
+            } else {
+              hoverPopup = new maplibregl.Popup({closeButton:false, offset:[0,-30]})
+                .setLngLat(e.lngLat)
+                .setHTML('<b>'+props.name+'</b><br/>'+(props.district||'')+'<br/>'+metricName[curMetric]+': <b>'+(v!=null?Number(v).toLocaleString():'—')+'</b>')
+                .addTo(map);
+            }
           } else {
             el.style.cursor = '';
-            map.getCanvas().style.cursor = '';
+            if(hoverPopup){ hoverPopup.remove(); hoverPopup = null; }
           }
         });
         updateMap();
