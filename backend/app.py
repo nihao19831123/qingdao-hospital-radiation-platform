@@ -34,6 +34,25 @@ def echarts():
     return FileResponse(os.path.join(ROOT, "echarts.min.js"))
 
 
+@app.get("/maplibre-gl.js")
+def ml_js():
+    return FileResponse(os.path.join(ROOT, "maplibre-gl.js"))
+
+
+@app.get("/maplibre-gl.css")
+def ml_css():
+    return FileResponse(os.path.join(ROOT, "maplibre-gl.css"))
+
+
+@app.get("/api/mapdata")
+def mapdata():
+    """MapLibre WGS-84 地图数据"""
+    p = os.path.join(BASE, "mapdata_wgs84.json")
+    if os.path.exists(p):
+        return FileResponse(p, media_type="application/json")
+    return JSONResponse({"error": "mapdata 未生成"}, status_code=404)
+
+
 @app.get("/api/inspect")
 def inspect():
     """AI 智能巡检: 检测 + 归因 + 大模型解释(并发)"""
