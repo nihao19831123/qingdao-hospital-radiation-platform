@@ -170,7 +170,7 @@ var DATA = {"years": [2020, 2021, 2022, 2023, 2024, 2025, 2026], "population": {
         }
       });
     }
-    var feats = M.streets.features.map(function(f){
+    var feats = M.streets_inset.features.map(function(f){
       var n = f.properties.name;
       var v = sd.find(function(x){ return x.name === n; });
       var color = '#1a2b4d';
@@ -229,16 +229,17 @@ var DATA = {"years": [2020, 2021, 2022, 2023, 2024, 2025, 2026], "population": {
       window.__map = map;
       map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'bottom-right');
       map.on('load', function(){
-        map.addSource('streets', {type:'geojson', data: M.streets});
+        map.addSource('streets', {type:'geojson', data: M.streets_inset});
+        map.addSource('streets-border', {type:'geojson', data: M.streets_border});
         map.addSource('districts', {type:'geojson', data: M.districts});
         map.addSource('hospitals', {type:'geojson', data: {type:'FeatureCollection', features:[]}});
         map.addSource('flow', {type:'geojson', data: {type:'FeatureCollection', features:[]}});
         map.addLayer({id:'districts-line', type:'line', source:'districts',
           paint:{'line-color':'#3fa7d6', 'line-width':1.4, 'line-opacity':0.75, 'line-blur':0.6}});
-        // 街道边界发光层 (比数据层高200m, 形成每个街道的包边)
-        map.addLayer({id:'street-borders3d', type:'fill-extrusion', source:'streets',
-          paint:{'fill-extrusion-color':'#4a7dff', 'fill-extrusion-height':['case',['boolean',['feature-state','hot'],false],5400,3200],
-                 'fill-extrusion-opacity':1, 'fill-extrusion-vertical-gradient':false}});
+        // 街道边界线 (原边界, 发光)
+        map.addLayer({id:'street-borders', type:'line', source:'streets-border',
+          paint:{'line-color':'#5b8fff', 'line-width':1, 'line-opacity':0.85, 'line-blur':0.4}});
+        // 街道 3D 数据层 (收缩后留缝隙)
         map.addLayer({id:'streets-3d', type:'fill-extrusion', source:'streets',
           paint:{'fill-extrusion-color':['get','color'], 'fill-extrusion-height':['case',['boolean',['feature-state','hot'],false],5200,3000],
                  'fill-extrusion-opacity':0.95, 'fill-extrusion-vertical-gradient':false}});

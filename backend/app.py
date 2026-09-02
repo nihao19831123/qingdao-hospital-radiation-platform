@@ -2,6 +2,7 @@
 """AI 医疗服务辐射智能巡检引擎 - FastAPI 服务.
 启动: python app.py  →  http://localhost:8000
 """
+import json
 import os
 import sys
 
@@ -46,10 +47,15 @@ def ml_css():
 
 @app.get("/api/mapdata")
 def mapdata():
-    """MapLibre WGS-84 地图数据"""
+    """MapLibre WGS-84 地图数据 (含收缩街道+边界线)"""
     p = os.path.join(BASE, "mapdata_wgs84.json")
-    if os.path.exists(p):
-        return FileResponse(p, media_type="application/json")
+    ip = os.path.join(BASE, "street_inset.json")
+    if os.path.exists(p) and os.path.exists(ip):
+        d = json.load(open(p, encoding="utf-8"))
+        ins = json.load(open(ip, encoding="utf-8"))
+        d["streets_inset"] = ins["streets_inset"]
+        d["streets_border"] = ins["streets_border"]
+        return JSONResponse(d)
     return JSONResponse({"error": "mapdata 未生成"}, status_code=404)
 
 
