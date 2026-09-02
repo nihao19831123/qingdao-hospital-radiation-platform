@@ -235,9 +235,13 @@ var DATA = {"years": [2020, 2021, 2022, 2023, 2024, 2025, 2026], "population": {
         map.addSource('flow', {type:'geojson', data: {type:'FeatureCollection', features:[]}});
         map.addLayer({id:'districts-line', type:'line', source:'districts',
           paint:{'line-color':'#3fa7d6', 'line-width':1.4, 'line-opacity':0.75, 'line-blur':0.6}});
+        // 街道边界发光层 (比数据层高200m, 形成每个街道的包边)
+        map.addLayer({id:'street-borders3d', type:'fill-extrusion', source:'streets',
+          paint:{'fill-extrusion-color':'#4a7dff', 'fill-extrusion-height':['case',['boolean',['feature-state','hot'],false],5400,3200],
+                 'fill-extrusion-opacity':1, 'fill-extrusion-vertical-gradient':false}});
         map.addLayer({id:'streets-3d', type:'fill-extrusion', source:'streets',
           paint:{'fill-extrusion-color':['get','color'], 'fill-extrusion-height':['case',['boolean',['feature-state','hot'],false],5200,3000],
-                 'fill-extrusion-opacity':0.88, 'fill-extrusion-vertical-gradient':false}});
+                 'fill-extrusion-opacity':0.95, 'fill-extrusion-vertical-gradient':false}});
         map.addLayer({id:'flow-line', type:'line', source:'flow',
           paint:{'line-color':'#ffd76a', 'line-width':['get','w'], 'line-opacity':0.45}});
         map.addLayer({id:'hospitals', type:'circle', source:'hospitals',
