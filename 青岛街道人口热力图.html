@@ -188,13 +188,15 @@ var DATA = {"years": [2020, 2021, 2022, 2023, 2024, 2025, 2026], "population": {
       var flowFeats = topF.map(function(t){
         var c = M.coords[t.name];
         if(!c || !main) return null;
-        return {type:'Feature', properties:{w: Math.max(1, Math.min(4, t.v/700))},
+        return {type:'Feature', properties:{w: Math.max(1.5, Math.min(5, t.v/450))},
           geometry:{type:'LineString', coordinates:[c, [main.lng, main.lat]]}};
       }).filter(Boolean);
       map.getSource('flow').setData({type:'FeatureCollection', features: flowFeats});
       map.setLayoutProperty('flow-line', 'visibility', 'visible');
+      map.setLayoutProperty('flow-line-glow', 'visibility', 'visible');
     } else {
       map.setLayoutProperty('flow-line', 'visibility', 'none');
+      map.setLayoutProperty('flow-line-glow', 'visibility', 'none');
     }
     // 医院点
     var hosFeats = M.hospitals.map(function(h){
@@ -243,8 +245,11 @@ var DATA = {"years": [2020, 2021, 2022, 2023, 2024, 2025, 2026], "population": {
         map.addLayer({id:'streets-3d', type:'fill-extrusion', source:'streets',
           paint:{'fill-extrusion-color':['get','color'], 'fill-extrusion-height':['case',['boolean',['feature-state','hot'],false],5200,3000],
                  'fill-extrusion-opacity':0.95, 'fill-extrusion-vertical-gradient':false}});
+        // 患者流向飞线 (亮青色发光)
         map.addLayer({id:'flow-line', type:'line', source:'flow',
-          paint:{'line-color':'#ffd76a', 'line-width':['get','w'], 'line-opacity':0.45}});
+          paint:{'line-color':'#00e5c8', 'line-width':['get','w'], 'line-opacity':0.85, 'line-blur':0.6}});
+        map.addLayer({id:'flow-line-glow', type:'line', source:'flow',
+          paint:{'line-color':'#00e5c8', 'line-width':['get','w'], 'line-opacity':0.3, 'line-blur':2.5, 'line-gap-width':0}});
         map.addLayer({id:'hospitals', type:'circle', source:'hospitals',
           paint:{'circle-radius':['get','r'], 'circle-color':['get','c'], 'circle-blur':0.3, 'circle-opacity':0.95,
                  'circle-stroke-color':'#ffffff', 'circle-stroke-width':['get','sw'], 'circle-stroke-opacity':0.9}});
