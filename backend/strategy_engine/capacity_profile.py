@@ -124,7 +124,7 @@ def build():
     cur.execute("""CREATE TABLE hospital_params(
         param TEXT PRIMARY KEY, value REAL, note TEXT)""")
     params = [
-        ("beds", 900, "医院编制床位(可修改)"),
+        ("beds", 800, "医院编制床位(可修改)"),
         ("bed_usage_rate", 0.64, "床位使用率基线"),
         ("annual_opd", 550000, "年门诊量基线"),
         ("annual_ipd", 26000, "年住院量基线"),

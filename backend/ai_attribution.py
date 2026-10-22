@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""② 智能归因: 对异常事件计算科室贡献度 + 门诊/住院贡献."""
+"""② 智能归因: 对异常事件计算科室贡献度 + 门诊/住院贡献 + 竞争压力(附加字段)."""
 import json
 import os
+
+import competition
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "heatmap_data.json")
 
 def attribute(street):
-    """返回 {dept_contrib: [...], visit_contrib: {...}}"""
+    """返回 {dept_contrib: [...], visit_contrib: {...}, competition: {...}(附加字段)}"""
     data = json.load(open(DATA_FILE, encoding="utf-8"))
     depts = data.get("departments", {})
     dis24 = data["discharge"].get("2024", {})
@@ -14,11 +16,15 @@ def attribute(street):
     opd24 = data["opd"].get("2024", {})
     opd25 = data["opd"].get("2025", {})
 
+    # 竞争压力附加字段 (competition.street_competition; 旧字段全部原样保留, 仅新增 competition 键)
+    comp = competition.street_competition(street)
+
     v24 = dis24.get(street, 0)
     v25 = dis25.get(street, 0)
     total_chg = v25 - v24
     if total_chg == 0:
-        return {"dept_contrib": [], "visit_contrib": {}, "total_chg": 0}
+        return {"dept_contrib": [], "visit_contrib": {}, "total_chg": 0,
+                "competition": comp}
 
     # 科室贡献: 街道2025科室结构 按增量比例
     dept_contrib = []
@@ -42,7 +48,7 @@ def attribute(street):
         visit_contrib["opd_pct"] = round(abs_o / (abs_o + abs_i) * 100, 1)
         visit_contrib["ipd_pct"] = round(abs_i / (abs_o + abs_i) * 100, 1)
     return {"dept_contrib": dept_contrib, "visit_contrib": visit_contrib,
-            "total_chg": total_chg, "opd_chg": o_chg}
+            "total_chg": total_chg, "opd_chg": o_chg, "competition": comp}
 
 if __name__ == "__main__":
     import sys

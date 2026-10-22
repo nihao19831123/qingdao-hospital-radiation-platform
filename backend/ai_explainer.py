@@ -39,6 +39,11 @@ def _template(event, attribution):
     if e.get("dept") is not None:
         lines.append(f"「{e['dept']}」占该街道出院{e['dept_share']}%（全院{e['all_share']}%），形成专科优势")
     lines.append(f"增量主要来源科室：{dept_line}；门诊贡献约{opd_pct}%")
+    # 竞争压力附加提示: 高/极高竞争街道需考虑竞争医院截流 (competition 字段可能缺失, 兼容旧数据)
+    comp = (d.get("competition") or {}) if isinstance(d, dict) else {}
+    if comp.get("level") in ("高", "极高"):
+        lines.append(f"该街道 {comp['nearest_dist']}km 处有{comp['nearest_name']}（{comp['nearest_level']}），"
+                     f"竞争截流风险{comp['level']}（CPI {comp['cpi']}），建议加强转诊对接与专科差异化")
     advice = {
         "异常增长": "建议进一步分析该区域患者增长来源、转诊渠道及复诊结构，判断是否形成稳定的辐射优势。",
         "异常下降": "建议核查该区域服务可及性、医保政策及转诊流向变化，评估是否存在患者流失。",
@@ -56,8 +61,11 @@ def explain(event, attribution):
     payload = {
         "model": "deepseek-chat",
         "messages": [
-            {"role": "system", "content": "你是医院管理决策助手。请根据给定的结构化医疗数据，生成一段面向医院领导的管理分析结论（150字内），包含：现象概述、原因归因、建议关注。语言专业、简洁、有管理视角。"},
-            {"role": "user", "content": json.dumps({"event": event, "attribution": attribution}, ensure_ascii=False)},
+            {"role": "system", "content": "你是医院管理决策助手。请根据给定的结构化医疗数据，生成一段面向医院领导的管理分析结论（150字内），包含：现象概述、原因归因、建议关注。语言专业、简洁、有管理视角。若数据中竞争压力(competition)为高或极高，归因需考虑竞争医院截流。"},
+            {"role": "user", "content": json.dumps(
+                {"event": event, "attribution": attribution,
+                 "competition": (attribution or {}).get("competition") if isinstance(attribution, dict) else None},
+                ensure_ascii=False)},
         ],
         "temperature": 0.4,
         "max_tokens": 500,

@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>个体级患者智能体蜂群 · 战略推演</title>
+<script>/* 早期错误捕获：把加载期异常连行列号记下来（便于定位"脚本没跑完"这类问题） */
+window.addEventListener('error', function(e){ window.__earlyErr = (e.message||'(空)')+' @'+(e.filename||'')+':'+e.lineno+':'+e.colno; });
+window.addEventListener('unhandledrejection', function(e){ window.__rejErr = String(e.reason); });</script>
+<script src="/maplibre-gl.js"></script>
+<link href="/maplibre-gl.css" rel="stylesheet">
+<style>
+:root{--bg:#070b14;--panel:#0d1424;--panel2:#111a2e;--line:#1e2b45;--txt:#e6eefc;--dim:#8ba0c4;
+      --self:#00e5c8;--comp:#ff9f43;--out:#5a6b86;--accent:#4a7dff;--warn:#ffd166}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:"Microsoft YaHei","PingFang SC",sans-serif;font-size:13px;overflow:hidden}
+#app{display:grid;grid-template-columns:286px 1fr 336px;grid-template-rows:56px 1fr 46px;height:100vh}
+header{grid-column:1/4;display:flex;align-items:center;gap:14px;padding:0 16px;background:linear-gradient(90deg,#0b1220 0%,#0d1424 60%,#101c33 100%);border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0;letter-spacing:1px;white-space:nowrap}
+header h1 span{color:var(--self)}
+.ctl{display:flex;align-items:center;gap:6px}
+select,input[type=range]{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:4px 6px;font-size:12px}
+button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:5px 10px;cursor:pointer;font-size:12px}
+button:hover{border-color:var(--accent)}
+button.run{background:#0f7a5f;border-color:#12a37c;font-weight:600}
+button.on{background:#1b2b4d;border-color:var(--accent);color:#cfe0ff}
+#side,#right{background:var(--panel);overflow:auto;border-right:1px solid var(--line)}
+#right{border-right:none;border-left:1px solid var(--line)}
+.sec{padding:10px 12px;border-bottom:1px solid var(--line)}
+.sec h3{margin:0 0 8px;font-size:12px;color:var(--dim);font-weight:600;letter-spacing:.5px}
+.kv{display:flex;justify-content:space-between;padding:2px 0}
+.kv b{color:var(--self);font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:7px 9px}
+.card .n{font-size:16px;color:#fff;font-variant-numeric:tabular-nums}
+.card .t{font-size:11px;color:var(--dim);margin-top:2px}
+#stage{position:relative;background:#080d18;overflow:hidden}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+#map{position:absolute;inset:0;display:none}
+.badge{position:absolute;left:12px;top:12px;background:rgba(8,14,26,.86);border:1px solid var(--line);
+       border-radius:6px;padding:7px 11px;font-size:12px;line-height:1.6;pointer-events:none;z-index:5}
+.badge b{color:var(--self)}
+.legend{position:absolute;right:12px;top:12px;background:rgba(8,14,26,.86);border:1px solid var(--line);
+        border-radius:6px;padding:8px 11px;font-size:11.5px;line-height:1.7;z-index:5}
+.dotc{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
+footer{grid-column:1/4;display:flex;align-items:center;gap:10px;padding:0 16px;background:var(--panel);border-top:1px solid var(--line)}
+#years{display:flex;gap:6px}
+.note{margin-left:auto;color:var(--dim);font-size:11.5px}
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+th,td{padding:3px 4px;border-bottom:1px solid #16223a;text-align:left;white-space:nowrap}
+th{color:var(--dim);font-weight:500;cursor:pointer;position:sticky;top:0;background:var(--panel)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.bar{height:9px;display:flex;border-radius:2px;overflow:hidden;min-width:70px}
+.bar i{display:block;height:100%}
+tr.hot td:first-child{color:var(--self);font-weight:600}
+#d1 .row{display:flex;justify-content:space-between;padding:2px 0;font-size:12px}
+#d1 .comp{margin:5px 0}
+#d1 .comp .lab{display:flex;justify-content:space-between;font-size:11.5px;color:var(--dim)}
+#d1 .comp .track{height:8px;background:#16223a;border-radius:3px;overflow:hidden}
+#d1 .comp .fill{height:100%;background:linear-gradient(90deg,#0f7a5f,#00e5c8)}
+#d1 .prob{display:flex;gap:4px;margin-top:6px}
+#d1 .prob i{height:7px;display:block}
+.hint{color:var(--dim);font-size:11.5px;line-height:1.7}
+.small{font-size:11px;color:var(--dim)}
+.warnbox{background:#2a2113;border:1px solid #6b5620;color:#ffe6a8;border-radius:5px;padding:6px 8px;font-size:11.5px;line-height:1.6}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>个体级患者智能体蜂群 · <span>战略推演</span></h1>
+    <div class="ctl">动作
+      <select id="fAction">
+        <option value="specialty">专科能力提升</option>
+        <option value="alliance">医联体建设</option>
+        <option value="capacity">资源扩容</option>
+      </select>
+    </div>
+    <div class="ctl">科室<select id="fDept"></select></div>
+    <div class="ctl">强度<input type="range" id="fMag" min="5" max="50" step="5" value="30" style="width:92px">
+      <span id="fMagV" class="small">30%</span></div>
+    <div class="ctl">年限<select id="fYears">
+      <option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select>
+    </div>
+    <div class="ctl">精度<select id="fPrec">
+      <option value="fast">演示档</option><option value="standard" selected>标准档</option>
+      <option value="full">出报告档</option></select>
+    </div>
+    <button class="run" id="btnRun">▶ 运行推演</button>
+    <span id="stat" class="small"></span>
+  </header>
+
+  <div id="side">
+    <div class="sec">
+      <h3>视图</h3>
+      <div class="grid2">
+        <button class="view on" data-v="migrate">① 人群迁徙</button>
+        <button class="view" data-v="map">② 地图波前</button>
+        <button class="view" data-v="compare">③ 双蜂群对比</button>
+        <button class="view" data-v="band">④ 分带明细</button>
+        <button class="view" data-v="tile">⑤ 街道阵列</button>
+        <button class="view" data-v="flow">⑥ 迁移流</button>
+        <button class="view" data-v="streets">⑦ 街道构成</button>
+        <button class="view" data-v="drill">⑧ 单街道钻取</button>
+        <button class="view" data-v="waterfall">⑨ 份额瀑布</button>
+      </div>
+      <div class="small" style="margin-top:6px" id="viewNote"></div>
+    </div>
+
+    <div class="sec">
+      <h3>焦点口径（本次答辩主口径）</h3>
+      <div class="ctl"><input type="checkbox" id="fFocus" checked><label for="fFocus">只显示「被战略触动」的个体</label></div>
+      <div class="ctl" style="margin-top:6px">阈值 |Δp| ≥ <input type="range" id="fTh" min="0" max="40" step="1" value="5" style="width:120px">
+        <span id="fThV" class="small">0.005</span></div>
+      <div class="small" style="margin-top:8px">着色口径（都在后端口径内）：
+        <div class="grid2" style="margin-top:4px">
+          <button class="cmode" data-c="prob">期望概率（推荐）</button>
+          <button class="cmode on" data-c="ch">抽样选择</button>
+        </div>
+        <div style="margin-top:4px" id="cmodeNote"></div>
+      </div>
+      <div class="small" style="margin-top:6px" id="focusNote"></div>
+    </div>
+
+    <div class="sec">
+      <h3>推演结果（后端口径）</h3>
+      <div class="grid2" id="cards"></div>
+      <div class="kv" style="margin-top:6px"><span>80% 辐射半径</span><b id="kR80">—</b></div>
+      <div class="kv"><span>区域 HRI（选定区域）</span><b id="kHri">—</b></div>
+      <div class="kv"><span>智能体规模</span><b id="kAgents">—</b></div>
+      <div class="kv"><span>种子 / 算法版本</span><b id="kSeed">—</b></div>
+      <div class="warnbox" style="margin-top:8px" id="flagBox">等待运行…</div>
+    </div>
+
+    <div class="sec" id="streetBox">
+      <h3>⑦ 街道构成（点行 → 钻取）</h3>
+      <div class="small">排序：
+        <button class="sortbtn on" data-s="net">变动人数</button>
+        <button class="sortbtn" data-s="share">我院占比</button>
+        <button class="sortbtn" data-s="d">距离</button>
+      </div>
+      <div id="streetTable" style="margin-top:6px;max-height:46vh;overflow:auto"></div>
+    </div>
+  </div>
+
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="map"></div>
+    <div class="badge" id="badge">等待运行…</div>
+    <div class="legend">
+      <div><i class="dotc" style="background:var(--self)"></i>选择我院</div>
+      <div><i class="dotc" style="background:var(--comp)"></i>选择竞争医院</div>
+      <div><i class="dotc" style="background:var(--out)"></i>未就诊</div>
+      <div><i class="dotc" style="background:#33415c"></i>背景层（未被触动）</div>
+      <div class="small" style="margin-top:4px">点任意个体 → 右侧决策卡</div>
+    </div>
+  </div>
+
+  <div id="right">
+    <div class="sec"><h3>D1 个体决策卡（后端单点接口）</h3>
+      <div id="d1" class="hint">点舞台上的任意一个个体，查看它的画像与「为什么这样选」的效用分量分解。<br>
+      数值全部来自 <code>/api/strategy/agent/agent</code>，前端不做任何效用计算。</div>
+    </div>
+    <div class="sec"><h3>口径声明（随图表常驻）</h3>
+      <div class="hint" id="disc">
+        智能体为<b>合成患者智能体</b>（街道人口 × 科室结构的抽样代表），非真实患者、不含个人信息；<br>
+        推演为<b>模型模拟、仅供决策实验</b>；基线量级由真实数据锚定；<br>
+        与老引擎「经验式推演」的绝对量级<b>不可并列</b>；全部数字可由「参数→公式→结果」复核。
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div id="years"></div>
+    <button id="btnPlay">▶ 播放</button>
+    <span class="small" id="yearStat"></span>
+    <span class="note">数据：个体级选择序列与概率均来自后端引擎（同参数 + 同种子可复算）</span>
+  </footer>
+</div>
+<script>
+/* ══════════════════════════════════════════════════════════════
+   个体级蜂群视图（阶段 6）· 数据 100% 来自后端 /api/strategy/agent/*
+   · /run{params,want_trace} → 指标 + 个体级帧数据（选择序列 + 基期/末年概率）
+   · /agent?run_id&agent_id&year → D1 个体决策卡（效用分量分解）
+   · /api/mapdata → 街道多边形（MapLibre 地图视图）
+   纪律：前端不做任何效用/概率计算；焦点口径按后端给出的 |p_end − p_base| 筛选。
+   ══════════════════════════════════════════════════════════════ */
+const C = {self:'#00e5c8', comp:'#ff9f43', out:'#5a6b86', dim:'#33415c'};
+const S = {
+  run:null, data:null, meta:null, streets:null, geojson:null,
+  year:0, view:'migrate', focus:true, th:0.005, cmode:'prob', pMax:0.05,
+  sel:null, playing:false, sort:'net', drillSi:null, sortDir:-1,
+  agents:[], perYear:{}, byStreet:{}, affected:null, hits:[], rowHits:[], backHit:null,
+  anim:{t:0, from:null, to:null, active:false}, wave:0, waveOn:false, neigh:null, map:null
+};
+const $ = id => document.getElementById(id);
+/* 验收/脚本钩子：**尽早就挂**（函数声明已提升），末尾再刷新一次——避免任何后续异常把它吞掉 */
+window.__swarm = {get S(){return S;}, runSim, setYear, switchView, showAgent, draw, boot:null};
+window.__boot = {startedAt: new Date().toISOString(), t:0, err:null};
+const fmt = n => (n===null||n===undefined) ? '—' : n.toLocaleString('zh-CN');
+const q = (n,d) => Math.round(n*Math.pow(10,d))/Math.pow(10,d);
+const DEFAULT_DEPTS = ['心内科','神经内科','消化内科','骨科','儿科','呼吸内科','妇产科','普外科','其他'];
+function fillDepts(list, keep){
+  const sel=$('fDept'), cur=keep||sel.value;
+  sel.innerHTML = list.map(d=>`<option value="${d}">${d}</option>`).join('');
+  if(list.indexOf(cur)>=0) sel.value = cur;
+  else if(list.indexOf('心内科')>=0) sel.value = '心内科';
+}
+
+/* ───────── 后端交互 ───────── */
+async function api(path, opts){
+  const r = await fetch(path, opts);
+  if(!r.ok) throw new Error(path+' → HTTP '+r.status);
+  return r.json();
+}
+async function ensureMeta(){
+  if(S.geojson) return;
+  const md = await api('/api/mapdata');
+  // 街道索引口径：**以引擎帧数据的 street_table 为准**（后端街名 → si），地图多边形按名称对齐
+  S.streetNameBySi = (S.data && S.data.street_table ? S.data.street_table.map(r=>r[0])
+                     : md.streets.features.map(f=>f.properties.name));
+  S.nameToSi = {}; S.streetNameBySi.forEach((nm,si)=>S.nameToSi[nm]=si);
+  S.geojson = {type:'FeatureCollection', features: md.streets.features.map(f=>({
+      type:'Feature', properties:{name:f.properties.name, district:f.properties.district, c:'#16223a'},
+      geometry:f.geometry}))};
+  S.streets = S.streetNameBySi;
+}
+async function runSim(){
+  const params = {
+    action: $('fAction').value, dept: $('fDept').value,
+    magnitude: parseInt($('fMag').value)/100, years: parseInt($('fYears').value)
+  };
+  $('stat').textContent = '计算中…';
+  const t0 = performance.now();
+  const res = await api('/api/strategy/agent/run', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({params, precision: $('fPrec').value, want_trace:true, want_prob:true, save:true, note:'蜂群视图'})});
+  await ensureMeta();
+  S.run = res; S.data = res.trace; S.meta = res.trace.meta;
+  $('stat').textContent = `用时 ${((performance.now()-t0)/1000).toFixed(1)}s ｜ 精度档：${res.precision} ｜ run_id=${res.run_id}`;
+  fillDepts(S.data.dept_table, res.params.dept);
+  buildAgents(); buildYears(); refreshCards(); refreshFocus(); buildStreetIndex(); renderStreets();
+  setYear(0, true);
+  if(S.view==='map') drawMapAgents();
+}
+/* 用后端帧数据构建前端索引（只做搬运与计数，不做建模） */
+function buildAgents(){
+  const a = S.data.agents, n = S.meta.n, A = [];
+  for(let i=0;i<n;i++){
+    A.push({i, si:a.street_idx[i], di:a.dept_idx[i], sens:a.dist_sens[i], loyal:a.loyal[i],
+            w:a.weight[i], pb:a.p_self_base[i], pe:a.p_self_end[i],
+            ch:S.data.choice[i],                     // 逐年选择串 '012' 由后端给出
+            d:Math.abs(a.p_self_end[i]-a.p_self_base[i])});
+  }
+  S.agents = A;
+  S.mx=null; S.bandS=null; S.tileHit=[];      // 新数据 → 派生缓存失效
+  S.affected = A.filter(x=>x.d>=S.th).map(x=>x.i);
+  S.affectedSet = new Set(S.affected);
+  // 逐年三态计数 + 逐年分街道计数（计数即可，口径来自后端选择序列）
+  const years = S.meta.years.length;
+  S.perYear = {};
+  for(let t=0;t<years;t++){
+    const cnt={0:0,1:0,2:0}, bySt={};
+    for(const x of A){ const c=+x.ch[t]; cnt[c]++;
+      (bySt[x.si] = bySt[x.si] || {0:0,1:0,2:0})[c]++; }
+    S.perYear[t]={cnt, bySt};
+  }
+  // 期望态着色标尺：末年个体概率的 95 分位（避免个别极端值压平色阶）
+  const pe=A.map(x=>x.pe).sort((a,b)=>a-b);
+  S.pMax = Math.max(0.02, pe[Math.floor(pe.length*0.95)] || 0.05);
+  S.probHist = S.data.agents.p_self_hist || null;
+}
+/* 着色：抽样选择（离散三色）或期望概率（灰→青绿渐变，后端 p_self 驱动） */
+function probOf(a,t){
+  if(S.probHist && S.probHist[t]) return S.probHist[t][a.i];
+  return a.pb + (a.pe - a.pb) * (t/Math.max(1,S.meta.years.length-1));
+}
+function colorFor(a,t){
+  if(S.cmode==='ch') return colorOf(a, +a.ch[t]);
+  const p = probOf(a,t), k = Math.min(1, Math.max(0, p/S.pMax));
+  const lerp=(x,y)=>Math.round(x+(y-x)*k);
+  return `rgb(${lerp(51,0)},${lerp(65,229)},${lerp(92,200)})`;
+}
+function buildYears(){
+  const box = $('years'); box.innerHTML='';
+  S.meta.years.forEach((y,t)=>{
+    const b=document.createElement('button'); b.textContent=y; b.onclick=()=>setYear(t,true);
+    b.dataset.t=t; box.appendChild(b);
+  });
+  $('yearStat').textContent = `${S.meta.years.length} 年 ｜ 起点 ${S.meta.years[0]}`;
+}
+/* ───────── 指标卡（后端口径） ───────── */
+function refreshCards(){
+  const m=S.run.metrics;
+  const cards=[
+    ['累计新增门诊 P50', fmt(m.final_add_opd.p50), `P5 ${fmt(m.final_add_opd.p5)} ~ P95 ${fmt(m.final_add_opd.p95)}`],
+    ['累计新增住院 P50', fmt(m.final_add_ipd.p50), `P5 ${fmt(m.final_add_ipd.p5)} ~ P95 ${fmt(m.final_add_ipd.p95)}`],
+    ['期末床位使用率', m.final_bed_usage.p50+'%', '警戒线 90%'],
+    ['期末号源利用率', m.final_numsource_util.p50+'%', '警戒线 95%'],
+    ['从竞争医院转来', fmt(m.from_comp.p50)+' 个', '期初→期末迁移'],
+    ['从不就诊被激活', fmt(m.from_out.p50)+' 个', '战略的"新造需求"'],
+  ];
+  $('cards').innerHTML = cards.map(c=>`<div class="card"><div class="n">${c[1]}</div><div class="t">${c[0]}</div>
+      <div class="t" style="color:#5f7191">${c[2]}</div></div>`).join('');
+  const rr = (S.run.streets_meta||[]);
+  const r80 = S.run.radius80 || {}, hri = S.run.hri || {};
+  $('kR80').textContent = (r80.after!=null) ? `${r80.base} → ${r80.after} km` : '—';
+  $('kHri').textContent = (hri.region && hri.region.after!=null)
+      ? `${hri.region.before} → ${hri.region.after}（${hri.scope==='selected'?'选定区域':'全域口径恒为1'}）` : '—';
+  $('kAgents').textContent = fmt(S.run.agent_count||S.meta.n);
+  $('kSeed').textContent = `${S.run.seed} / ${S.run.algo_version}`;
+  const p=S.run.params;
+  $('flagBox').textContent = `${p.action}·${p.dept} ${Math.round(p.magnitude*100)}% / ${p.years}年 ｜ `
+    + `个体 ${S.meta.n} 个 ｜ 时间轴 ${S.meta.years[0]}–${S.meta.years[S.meta.years.length-1]}`;
+}
+function refreshFocus(){
+  $('fThV').textContent = S.th.toFixed(3);
+  const tot = S.agents.length, aff = S.affectedSet.size;
+  const changed = S.agents.filter(x=>x.ch[0]!==x.ch[x.ch.length-1]).length;
+  $('focusNote').innerHTML = `被战略触动的个体：<b style="color:var(--self)">${aff}</b> / 全部 ${tot}
+     （阈值 |Δp|≥${S.th.toFixed(3)}）<br>期末选择发生改变的个体：${changed} 个
+     <br><span style="color:#5f7191">两个口径都由后端数据算出：前者是概率变化幅度，后者是离散选择翻转。</span>`;
+  updBadge();
+}
+function updBadge(){
+  if(!S.meta || !S.affectedSet){ $('badge').textContent = '等待运行…'; return; }   // 未加载时直接返回（曾被这里吞掉整个启动序列）
+  const t=S.meta?S.meta.years[S.year]:'—';
+  const c=S.perYear[S.year]?S.perYear[S.year].cnt:{0:0,1:0,2:0};
+  const tot=S.agents.length||1;
+  const yr=(S.run&&S.run.years)?S.run.years[S.year]:null;
+  const exp = yr ? `<br>期望口径（后端·代表轮）：当年新增门诊 ${fmt(yr.add_opd)} 人次（P5–P95 ${fmt(yr.add_opd_p5)}~${fmt(yr.add_opd_p95)}）`
+                 + ` ｜ 累计 ${fmt(yr.cum_opd)} 人次（区间中位数见左侧卡片）` : '';
+  $('badge').innerHTML = `<b>${t}</b> 年 ｜ 我院 ${c[1]} 人（${(c[1]/tot*100).toFixed(1)}%）· `
+    + `竞争 ${c[2]} · 未就诊 ${c[0]}<br>` + exp + '<br>'
+    + (S.focus ? `仅显示<b>被战略触动</b>的个体 <b>${S.affectedSet.size}</b> / 全部 ${S.agents.length}
+        （|Δp|≥${S.th.toFixed(3)}，其余为背景层）` : `显示<b>全部</b> ${S.agents.length} 个个体`);
+}
+/* ───────── 布局：三块人群方阵（①） ───────── */
+const cv=$('cv'), ctx=cv.getContext('2d');
+let W=0,H=0,DPR=1;
+function resize(){ DPR=window.devicePixelRatio||1; const st=$('stage');
+  W=st.clientWidth; H=st.clientHeight; cv.width=W*DPR; cv.height=H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0); layout(); draw(); }
+function layout(){
+  const pad=26, gap=18, bw=(W-pad*2-gap*2)/3, bh=H*0.62, top=H*0.2;
+  S.zone={0:{x:pad,y:top,w:bw,h:bh},2:{x:pad+bw+gap,y:top,w:bw,h:bh},1:{x:pad+(bw+gap)*2,y:top,w:bw,h:bh}};
+  // 计算槽位（三区各自网格）
+  S.slot={};
+  for(const z of [0,1,2]){
+    const idx=S.agents.filter(a=>+a.ch[S.year]===z).map(a=>a.i);
+    const box=S.zone[z], cols=Math.max(1,Math.floor(Math.sqrt(idx.length*box.w/box.h))), rows=Math.ceil(idx.length/cols);
+    const dx=box.w/cols, dy=box.h/Math.min(rows, 999);
+    idx.forEach((i,k)=>{ const r=Math.floor(k/cols), cc=k%cols;
+      S.slot[i]={x:box.x+dx*(cc+0.5), y:box.y+dy*(r+0.5)}; });
+  }
+}
+function colorOf(a,z){ return z===1?C.self:(z===2?C.comp:C.out); }
+function draw(){
+  if(!S.agents.length){ ctx.clearRect(0,0,W,H); drawSplash(); return; }
+  if(S.view!=='migrate'){ ctx.clearRect(0,0,W,H); return; }
+  ctx.clearRect(0,0,W,H);
+  // 区框 + 标题 + 大数字
+  for(const z of [0,2,1]){
+    const b=S.zone[z];
+    ctx.fillStyle='rgba(13,20,36,.72)'; ctx.strokeStyle='#1e2b45';
+    roundRect(b.x,b.y,b.w,b.h,10); ctx.fill(); ctx.stroke();
+    const lab={0:'未就诊',2:'竞争医院',1:'选择我院'}[z];
+    const c=S.perYear[S.year].cnt[z];
+    ctx.fillStyle=colorOf(null,z); ctx.font='600 14px "Microsoft YaHei"';
+    ctx.fillText(lab, b.x+12, b.y-26);
+    ctx.font='700 26px "Microsoft YaHei"'; ctx.fillStyle='#fff';
+    ctx.fillText(c, b.x+12, b.y-5);
+    ctx.font='11px "Microsoft YaHei"'; ctx.fillStyle='#7f93b5';
+    ctx.fillText(`占 ${(c/(S.agents.length||1)*100).toFixed(1)}%`, b.x+52+String(c).length*15, b.y-6);
+  }
+  // 点（被触动者高亮、其余极淡做背景层）
+  const pul=(performance.now()%1400)/1400;
+  for(const a of S.agents){
+    const z=+a.ch[S.year], p=S.slot[a.i]; if(!p) continue;
+    const isA = !S.focus || S.affectedSet.has(a.i);
+    const pv = probOf(a, S.year);
+    const r = S.cmode==='ch' ? (z===1?3.1:(z===2?2.9:2.6)) : (2.2 + 3.4*Math.min(1, pv/S.pMax));
+    if(!isA){ ctx.globalAlpha=0.18; dot(p.x,p.y,2.1,'#33415c'); ctx.globalAlpha=1; continue; }
+    const flipped = a.ch[0]!==a.ch[S.year];
+    if(flipped && S.view==='migrate'){                       // 变化过的个体带一圈脉冲
+      ctx.beginPath(); ctx.arc(p.x,p.y, r+2.6+2.2*Math.sin(pul*Math.PI*2), 0, 7);
+      ctx.strokeStyle='rgba(0,229,200,.55)'; ctx.lineWidth=1; ctx.stroke();
+    }
+    dot(p.x,p.y,r,colorFor(a,S.year),1);
+  }
+  // 说明
+  ctx.fillStyle='#7f93b5'; ctx.font='12px "Microsoft YaHei"';
+  ctx.fillText('三块人群方阵：点=一位患者智能体；随年份推进，被战略改变的个体整块流向「选择我院」',
+      26, H-18);
+}
+function drawSplash(){ ctx.fillStyle='#7f93b5'; ctx.font='14px "Microsoft YaHei"';
+  ctx.fillText('点击右上角「▶ 运行推演」加载个体级帧数据（后端引擎实时计算）', 26, 40); }
+function dot(x,y,r,c,alpha){ ctx.globalAlpha=alpha; ctx.beginPath(); ctx.arc(x,y,r,0,7);
+  ctx.fillStyle=c; ctx.fill(); ctx.globalAlpha=1; }
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+/* ───────── ② 地图波前（MapLibre） ───────── */
+function initMap(){
+  if(S.map) return;
+  const style = {version:8, sources:{
+      streets:{type:'geojson', data:S.geojson},
+      agents:{type:'geojson', data:{type:'FeatureCollection',features:[]}},
+      wave:{type:'geojson', data:{type:'FeatureCollection',features:[]}}},
+    layers:[
+      {id:'bg', type:'background', paint:{'background-color':'#060a12'}},
+      {id:'sfill', type:'fill', source:'streets', paint:{'fill-color':['get','c'],'fill-opacity':0.9}},
+      {id:'sline', type:'line', source:'streets', paint:{'line-color':'#2b6bd6','line-width':0.7,'line-opacity':0.75}},
+      {id:'wave', type:'line', source:'wave', paint:{'line-color':'#00e5c8','line-width':2.2,'line-opacity':0.85}},
+      {id:'agents', type:'circle', source:'agents', paint:{
+        'circle-radius':['interpolate',['linear'],['zoom'],9,1.6,13,3.6,16,6],
+        'circle-color':['get','c'], 'circle-opacity':['get','o'], 'circle-stroke-width':0}}]};
+  S.map = new maplibregl.Map({container:'map', style:style,
+    center:[120.30,36.16], zoom:9.4, attributionControl:false});
+  S.map.on('load',()=>{ S.pendingMap=false; drawMapStreets(); drawMapAgents(); });
+}
+function mapReady(){ return !!(S.map && S.map.getSource('streets') && S.map.getSource('agents') && S.map.getSource('wave')); }   // 只要求源存在（MapLibre 在镜头移动中 loaded() 会短暂为 false）
+function drawMapStreets(){
+  if(!mapReady()){ S.pendingMap=true; return; }
+  const sm=S.perYear[S.year].bySt;
+  const feats=S.geojson.features.map(f=>{
+    const si=S.nameToSi[f.properties.name];
+    const c=(si===undefined?null:sm[si])||{0:0,1:0,2:0};
+    const tot=c[0]+c[1]+c[2]||1, share=c[1]/tot;
+    const col = share>0.5?'#0f7a5f': share>0.3?'#12604f': share>0.15?'#173a4a':'#16223a';
+    return {type:'Feature', properties:{name:f.properties.name, district:f.properties.district, c:col}, geometry:f.geometry};
+  });
+  S.map.getSource('streets').setData({type:'FeatureCollection', features:feats});
+}
+function drawMapAgents(){
+  if(!mapReady()){ S.pendingMap=true; return; }
+  const feats=[];
+  for(const a of S.agents){
+    const nm=S.streetNameBySi[a.si]; const f=S.geojson.features.find(x=>x.properties.name===nm);
+    if(!f) continue;
+    const [lng,lat]=centroid(f.geometry);
+    const j=((a.i*2654435761)%1000/1000-0.5)*0.012, j2=((a.i*40503)%1000/1000-0.5)*0.010;
+    const z=+a.ch[S.year], isA=!S.focus||S.affectedSet.has(a.i);
+    feats.push({type:'Feature', properties:{i:a.i, c:isA?colorFor(a,S.year):'#33415c', o:isA?0.95:0.22},
+                geometry:{type:'Point', coordinates:[lng+j, lat+j2]}});
+  }
+  S.map.getSource('agents').setData({type:'FeatureCollection', features:feats});
+}
+function centroid(g){ const c=g.coordinates[0]; let x=0,y=0; c.forEach(p=>{x+=p[0];y+=p[1]});
+  return [x/c.length, y/c.length]; }
+function wave(){
+  if(!mapReady()) return;
+  S.waveOn=true; S.wave=0;
+  const step=()=>{ S.wave+=0.6;
+    const km=S.wave, pts=[]; const H0=[120.3884087,36.1795722];
+    for(let i=0;i<=72;i++){ const th=i/72*Math.PI*2;
+      pts.push([H0[0]+km/89.6*Math.cos(th), H0[1]+km/111*Math.sin(th)]); }
+    S.map.getSource('wave').setData({type:'FeatureCollection',
+      features:[{type:'Feature', properties:{}, geometry:{type:'LineString', coordinates:pts}}]});
+    if(km<32) requestAnimationFrame(step); else { S.waveOn=false;
+      S.map.getSource('wave').setData({type:'FeatureCollection',features:[]}); }
+  };
+  requestAnimationFrame(step);
+}
+
+/* ───────── ⑦ 街道构成 + ⑧ 钻取 ───────── */
+function buildStreetIndex(){
+  S.byStreet={};
+  S.agents.forEach(a=>{ const s=S.byStreet[a.si]=S.byStreet[a.si]||{pre:{0:0,1:0,2:0},cur:{0:0,1:0,2:0},n:0};
+    s.n++; s.pre[+a.ch[0]]++; s.cur[+a.ch[a.ch.length-1]]++; });
+}
+function renderStreets(){
+  if(!S.data) return;
+  const rows=S.streets.map((nm,si)=>{
+    const b=S.byStreet[si]; if(!b) return null;
+    const net=b.cur[1]-b.pre[1], tot=b.n||1;
+    return {si, nm, n:b.n, pre:b.pre, cur:b.cur, net, share:b.cur[1]/tot, d:0};
+  }).filter(Boolean);
+  // 距离从后端 streets_meta 取（口径统一）
+  const dm={}; (S.run.streets_meta||[]).forEach(m=>dm[m.name]=m.d_km);
+  rows.forEach(r=>r.d=dm[r.nm]||0);
+  const k=S.sort, dir=S.sortDir;
+  rows.sort((a,b)=>(k==='net'?(b.net-a.net):k==='share'?(b.share-a.share):(a.d-b.d))*dir+0);
+  const bar=(c,tot)=>{ if(!tot) return '';
+    const p1=c[1]/tot*100,p2=c[2]/tot*100,p0=c[0]/tot*100;
+    return `<div class="bar"><i style="width:${p1}%;background:${C.self}"></i>
+      <i style="width:${p2}%;background:${C.comp}"></i><i style="width:${p0}%;background:${C.out}"></i></div>`; };
+  $('streetTable').innerHTML = `<table><thead><tr><th data-s="nm">街道</th><th data-s="d">距离</th>
+    <th>期初 → 期末构成</th><th data-s="net">变动</th><th data-s="share">我院占比</th></tr></thead><tbody>`
+    + rows.map(r=>`<tr class="${r.net/Math.max(1,r.n)>0.15?'hot':''}" data-si="${r.si}">
+        <td>${r.nm}<div class="small">${r.n} 个体</div></td>
+        <td class="num">${r.d}km</td>
+        <td>${bar(r.pre,r.n)}<div class="small" style="margin-top:2px">↓</div>${bar(r.cur,r.n)}</td>
+        <td class="num">${r.net>0?'+':''}${r.net}</td>
+        <td class="num">${(r.share*100).toFixed(1)}%</td></tr>`).join('')
+    + `</tbody></table>`;
+  $('streetTable').querySelectorAll('th[data-s]').forEach(th=>th.onclick=()=>{
+    const s=th.dataset.s; S.sortDir = (S.sort===s)? -S.sortDir : -1; S.sort=s; renderStreets(); });
+  $('streetTable').querySelectorAll('tr[data-si]').forEach(tr=>tr.onclick=()=>{
+    S.drillSi=+tr.dataset.si; switchView('drill'); });
+}
+function drawDrill(){
+  ctx.clearRect(0,0,W,H);
+  if(S.drillSi===null){ ctx.fillStyle='#7f93b5'; ctx.font='14px "Microsoft YaHei"';
+    ctx.fillText('在左侧「⑦ 街道构成」里点一行，进入该街道的个体级钻取', 26, 40); return; }
+  const b=S.byStreet[S.drillSi], nm=S.streets[S.drillSi];
+  const ids=S.agents.filter(a=>a.si===S.drillSi);
+  ctx.fillStyle='#e6eefc'; ctx.font='600 17px "Microsoft YaHei"';
+  ctx.fillText('⑧ ' + nm + ' · 个体级钻取', 24, 34);
+  ctx.fillStyle='#8ba0c4'; ctx.font='12px "Microsoft YaHei"';
+  ctx.fillText(`个体 ${ids.length} 个 ｜ 期初 我院${b.pre[1]} / 竞争${b.pre[2]} / 未就诊${b.pre[0]}` +
+    ` → 期末 我院${b.cur[1]} / 竞争${b.cur[2]} / 未就诊${b.cur[0]}`, 24, 56);
+  // 按科室分组画点
+  const groups={};
+  ids.forEach(a=>{ const d=S.data.dept_table[a.di]; (groups[d]=groups[d]||[]).push(a); });
+  const keys=Object.keys(groups).sort((x,y)=>groups[y].length-groups[x].length);
+  const gw=(W-72)/keys.length;
+  keys.forEach((k,gi)=>{
+    const g=groups[k], x0=24+gi*gw;
+    ctx.fillStyle='#8ba0c4'; ctx.font='12px "Microsoft YaHei"';
+    ctx.fillText(`${k}（${g.length}）`, x0, 92);
+    const cols=Math.ceil(Math.sqrt(g.length*1.6)), rows=Math.ceil(g.length/cols);
+    g.forEach((a,i)=>{ const cx=x0+(i%cols)*(gw/cols)+6, cy=110+Math.floor(i/cols)*13;
+      dot(cx,cy,3.2,colorFor(a,S.year), (!S.focus||S.affectedSet.has(a.i))?0.95:0.2); });
+  });
+  ctx.fillStyle='#7f93b5'; ctx.font='12px "Microsoft YaHei"';
+  ctx.fillText('每个点=该街道一位患者智能体，颜色=当年选择（数据来自后端帧数据）', 24, H-18);
+  S.backHit={x:24,y:H-52,w:110,h:26};
+  ctx.strokeStyle='#4a7dff'; roundRect(24,H-52,110,26,5); ctx.stroke();
+  ctx.fillStyle='#cfe0ff'; ctx.font='12px "Microsoft YaHei"'; ctx.fillText('◀ 返回街道列表', 40, H-34);
+}
+/* ───────── D1 个体决策卡（后端接口） ───────── */
+async function showAgent(i){
+  if(!S.run) return;
+  const yr=S.meta.years[S.year];
+  const d=await api(`/api/strategy/agent/agent?run_id=${S.run.run_id}&agent_id=${i}&year=${yr}`);
+  S.sel=i;
+  const p=d.profile, h=d.years[0]||{};
+  const comp=h.contrib||{};
+  const cmax=Math.max(0.001, ...Object.values(comp).map(Math.abs));
+  const cbar=(lab,v,note)=>`<div class="comp"><div class="lab"><span>${lab}</span><span>${(v>=0?'+':'')}${v.toFixed(3)}</span></div>
+     <div class="track"><div class="fill" style="width:${Math.min(100,Math.abs(v)/cmax*100)}%"></div></div>
+     <div class="small">${note}</div></div>`;
+  const prob=h.p_self||0, pc=h.p_comp||0, po=h.p_out||0;
+  $('d1').innerHTML = `
+    <div class="kv"><b>#${i}</b><span>${p.street} · ${p.dept}</span></div>
+    <div class="row"><span>距本院</span><b>${p.d_km} km</b></div>
+    <div class="row"><span>最近竞争医院</span><b>${p.comp||'—'}（${p.comp_grade||'—'} ${p.comp_d_km||'—'}km）</b></div>
+    <div class="row"><span>街道基线渗透率 p0</span><b>${p.p0}</b></div>
+    <div class="row"><span>个体画像</span><b>距离敏感 ${p.dist_sens} ｜ 忠诚度 ${p.loyal} ｜ 代表权重 ${p.weight}</b></div>
+    <div class="row"><span>年 / 当年选择</span><b>${yr} → ${h.choice_cn||'—'}</b></div>
+    <div class="prob" title="p(我院) / p(竞争) / p(不就诊)">
+      <i style="width:${prob*100}%;background:${C.self}"></i>
+      <i style="width:${pc*100}%;background:${C.comp}"></i>
+      <i style="width:${po*100}%;background:${C.out}"></i></div>
+    <div class="small">当年概率：我院 ${(prob*100).toFixed(1)}% ｜ 竞争 ${(pc*100).toFixed(1)}% ｜ 未就诊 ${(po*100).toFixed(1)}%</div>
+    <div style="margin-top:8px;font-weight:600;color:#8ba0c4">决策理由分量（效用分解）</div>
+    ${cbar('基期效用（锚定）', comp.base||0, '由街道真实门诊量反解，逐年不变')}
+    ${cbar('专科加成 β_sp', comp.sp||0, '战略强度 × 专科距离权重 × 释放曲线')}
+    ${cbar('容量加成 β_cap', comp.cap||0, '承接能力提升带来的增量')}
+    ${cbar('医联体加成 β_al', comp.al||0, '远郊加权（医联体动作）')}
+    <div class="row"><span>激活效应（odds 空间）</span><b>${(h.activation||0).toFixed(3)}</b></div>
+    <div class="row"><span>释放曲线 L(t)</span><b>${h.release}</b></div>
+    <div class="small" style="margin-top:6px">本卡全部数值来自 <code>/api/strategy/agent/agent</code>（同参数 + 同种子可复算）；
+      智能体为合成人群代表，不含任何个人信息。</div>`;
+}
+/* ───────── ③ 双蜂群对比（期初 vs 期末，同一批个体） ───────── */
+function migMatrix(){
+  if(S.mx) return S.mx;
+  const m=[[0,0,0],[0,0,0],[0,0,0]];
+  for(const a of S.agents) m[+a.ch[0]][+a.ch[a.ch.length-1]]++;
+  S.mx=m; return m;
+}
+function drawMiniSwarm(px,py,pw,ph,t,title){
+  const cnt=[0,0,0];
+  for(const a of S.agents) cnt[+a.ch[t]]++;
+  const total=S.agents.length||1;
+  ctx.fillStyle='#e6eefc'; ctx.font='600 15px "Microsoft YaHei"';
+  ctx.fillText(title, px, py-10);
+  const rows=[0,2,1], rh=(ph-10)/3;
+  rows.forEach((z,ri)=>{
+    const by=py+ri*rh;
+    ctx.fillStyle='rgba(13,20,36,.72)'; ctx.strokeStyle='#1e2b45';
+    roundRect(px,by,pw,rh-9,8); ctx.fill(); ctx.stroke();
+    const lab={0:'未就诊',2:'竞争医院',1:'选择我院'}[z];
+    ctx.fillStyle=colorOf(null,z); ctx.font='600 12.5px "Microsoft YaHei"';
+    ctx.fillText(lab, px+10, by+17);
+    ctx.font='700 19px "Microsoft YaHei"'; ctx.fillStyle='#fff';
+    ctx.fillText(cnt[z], px+10, by+40);
+    ctx.font='11px "Microsoft YaHei"'; ctx.fillStyle='#7f93b5';
+    ctx.fillText((cnt[z]/total*100).toFixed(1)+'%', px+10, by+56);
+    const inner={x:px+pw*0.3, y:by+7, w:pw*0.66, h:rh-22};
+    let k=0; const cols=Math.max(1,Math.round(Math.sqrt(Math.max(1,cnt[z])*inner.w/Math.max(1,inner.h))));
+    const dx=inner.w/cols, dy=inner.h/Math.max(1,Math.ceil(Math.max(1,cnt[z])/cols));
+    for(const a of S.agents){
+      if(+a.ch[t]!==z) continue;
+      const r=Math.floor(k/cols), cc=k%cols; k++;
+      const af=(!S.focus||S.affectedSet.has(a.i));
+      dot(inner.x+dx*(cc+0.5), inner.y+dy*(r+0.5), Math.min(2.3, Math.max(1.5, dy*0.36)), colorFor(a,t), af?0.95:0.16);
+    }
+  });
+}
+function drawCompare(){
+  ctx.clearRect(0,0,W,H);
+  if(!S.agents.length){ drawSplash(); return; }
+  const mx=migMatrix(), last=S.meta.years.length-1;
+  const pad=26, gap=34, pw=(W-pad*2-gap)/2, top=64, ph=H*0.56;
+  drawMiniSwarm(pad, top, pw, ph, 0, '期初（基线，含首年效应）');
+  drawMiniSwarm(pad+pw+gap, top, pw, ph, last, '期末（' + S.meta.years[last] + '）');
+  // 迁移矩阵摘要（后端选择序列的计数，不是模型推算）
+  const fromOut=mx[0][1], fromComp=mx[2][1], toOut=mx[1][0], toComp=mx[1][2];
+  const preSelf=mx[1][0]+mx[1][1]+mx[1][2], postSelf=mx[0][1]+mx[1][1]+mx[2][1];
+  const y0=top+ph+26;
+  ctx.fillStyle='#8ba0c4'; ctx.font='600 13px "Microsoft YaHei"';
+  ctx.fillText('选择迁移矩阵（个体级选择序列计数，前后同号同人）', pad, y0-6);
+  const cells=[
+    ['未就诊 → 我院', fromOut, C.self], ['竞争 → 我院', fromComp, C.self],
+    ['我院 → 竞争', toComp, '#ff6b6b'], ['我院 → 未就诊', toOut, '#ff6b6b'],
+    ['期初我院', preSelf, C.self], ['期末我院', postSelf, C.self],
+  ];
+  const cw=(W-pad*2-5*10)/6;
+  cells.forEach((c,i)=>{
+    const x=pad+i*(cw+10);
+    ctx.fillStyle='rgba(13,20,36,.8)'; ctx.strokeStyle='#1e2b45'; roundRect(x,y0,cw,64,8); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#7f93b5'; ctx.font='11.5px "Microsoft YaHei"'; ctx.fillText(c[0], x+8, y0+20);
+    ctx.fillStyle=c[2]; ctx.font='700 21px "Microsoft YaHei"'; ctx.fillText(c[1], x+8, y0+47);
+  });
+  const y1=y0+84;
+  ctx.fillStyle='#8ba0c4'; ctx.font='12.5px "Microsoft YaHei"';
+  ctx.fillText('净值：' + (fromOut+fromComp-toOut-toComp>=0?'+':'') + (fromOut+fromComp-toOut-toComp)
+    + ' 人 ｜ 期末份额 ' + (postSelf/(S.agents.length||1)*100).toFixed(1) + '%'
+    + '（期初 ' + (preSelf/(S.agents.length||1)*100).toFixed(1) + '%）'
+    + ' ｜ 口径：个体级离散选择；真实渗透率个位数时人数波动小，请看左侧期望概率口径', pad, y1);
+}
+/* ───────── ④ 分带明细（按距离分带） ───────── */
+const BANDS=[[0,3,'<3 km'],[3,6,'3–6 km'],[6,10,'6–10 km'],[10,15,'10–15 km'],[15,1e9,'≥15 km']];
+function bandStats(){
+  if(S.bandS) return S.bandS;
+  const dm={}; (S.run.streets_meta||[]).forEach(m=>dm[m.name]=m.d_km);
+  const out=BANDS.map(b=>({name:b[2],lo:b[0],hi:b[1],pre:[0,0,0],cur:[0,0,0],n:0,net:0}));
+  for(const a of S.agents){
+    const d=dm[S.streetNameBySi[a.si]]||0;
+    let bi=BANDS.length-1;
+    for(let i=0;i<BANDS.length;i++){ if(d>=BANDS[i][0] && d<BANDS[i][1]){ bi=i; break; } }
+    const o=out[bi]; o.n++; o.pre[+a.ch[0]]++; o.cur[+a.ch[a.ch.length-1]]++;
+  }
+  out.forEach(o=>o.net=o.cur[1]-o.pre[1]);
+  S.bandS=out; return out;
+}
+function stackedBar(x,y,w,h,c,tot){
+  const seg=[[1,C.self],[2,C.comp],[0,C.out]];
+  let cx=x;
+  for(const [z,col] of seg){ const ww=w*(c[z]/(tot||1)); ctx.fillStyle=col; ctx.fillRect(cx,y,Math.max(0,ww),h); cx+=ww; }
+  ctx.strokeStyle='#1e2b45'; ctx.lineWidth=1; ctx.strokeRect(x,y,w,h);
+}
+function drawBand(){
+  ctx.clearRect(0,0,W,H);
+  if(!S.agents.length){ drawSplash(); return; }
+  const bs=bandStats(), tot=S.agents.length||1;
+  const pad=30, top=58, rowH=(H-top-70)/bs.length;
+  ctx.fillStyle='#e6eefc'; ctx.font='600 16px "Microsoft YaHei"';
+  ctx.fillText('④ 距离分带明细：越近的带被战略触动的比例越高（期初 → 期末构成）', pad, 30);
+  ctx.fillStyle='#7f93b5'; ctx.font='11.5px "Microsoft YaHei"';
+  ctx.fillText('数据：街道距离取后端口径（streets_meta.d_km）；条形＝该带个体的选择构成（青绿 我院 / 橙 竞争 / 灰 未就诊）', pad, 48);
+  bs.forEach((b,i)=>{
+    const y=top+i*rowH;
+    ctx.fillStyle='#cbd5e1'; ctx.font='600 13.5px "Microsoft YaHei"';
+    ctx.fillText(b.name, pad, y+16);
+    ctx.fillStyle='#7f93b5'; ctx.font='11.5px "Microsoft YaHei"';
+    ctx.fillText(b.n + ' 个体（' + (b.n/tot*100).toFixed(1) + '%）', pad, y+34);
+    const bx=pad+120, bw=W-pad*2-120-250;
+    ctx.fillStyle='#7f93b5'; ctx.font='11px "Microsoft YaHei"';
+    ctx.fillText('期初', bx, y-2); ctx.fillText('期末', bx, y+rowH*0.52);
+    stackedBar(bx, y, bw, 16, b.pre, b.n);
+    stackedBar(bx, y+rowH*0.42, bw, 16, b.cur, b.n);
+    const sharePre=b.pre[1]/(b.n||1)*100, shareCur=b.cur[1]/(b.n||1)*100;
+    const tx=bx+bw+16;
+    ctx.fillStyle='#8ba0c4'; ctx.font='11.5px "Microsoft YaHei"';
+    ctx.fillText('我院占比 ' + sharePre.toFixed(1) + '% → ' + shareCur.toFixed(1) + '%', tx, y+13);
+    ctx.fillStyle = b.net>0 ? C.self : (b.net<0 ? '#ff6b6b' : '#7f93b5');
+    ctx.font='600 12.5px "Microsoft YaHei"';
+    ctx.fillText('净' + (b.net>0?'+':'') + b.net + ' 人', tx, y+31);
+  });
+  // 表尾：真正的转来/流失分解（从迁移矩阵按带统计）
+  const dm={}; (S.run.streets_meta||[]).forEach(m=>dm[m.name]=m.d_km);
+  const flows=bs.map(()=>({fromOut:0,fromComp:0,toOut:0,toComp:0}));
+  for(const a of S.agents){
+    const d=dm[S.streetNameBySi[a.si]]||0;
+    let bi=BANDS.length-1;
+    for(let i=0;i<BANDS.length;i++){ if(d>=BANDS[i][0] && d<BANDS[i][1]){ bi=i; break; } }
+    const p=+a.ch[0], c=+a.ch[a.ch.length-1];
+    if(p===0&&c===1) flows[bi].fromOut++;
+    if(p===2&&c===1) flows[bi].fromComp++;
+    if(p===1&&c===0) flows[bi].toOut++;
+    if(p===1&&c===2) flows[bi].toComp++;
+  }
+  bs.forEach((b,i)=>{
+    const y=top+i*rowH, tx=pad+120+(W-pad*2-120-250)+16;
+    ctx.fillStyle='#5f7191'; ctx.font='11px "Microsoft YaHei"';
+    ctx.fillText('转来 ' + (flows[i].fromOut+flows[i].fromComp) + '（未就诊 ' + flows[i].fromOut
+      + ' / 竞争 ' + flows[i].fromComp + '）｜流失 ' + (flows[i].toOut+flows[i].toComp), tx, y+48);
+  });
+}
+/* ───────── ⑤ 街道阵列（134 格，按距离排序，点格钻取） ───────── */
+function drawTile(){
+  ctx.clearRect(0,0,W,H);
+  if(!S.agents.length){ drawSplash(); return; }
+  const dm={}; (S.run.streets_meta||[]).forEach(m=>dm[m.name]=m.d_km);
+  const order=[...Array(S.streets.length).keys()].filter(si=>S.byStreet[si])
+      .sort((a,b)=>(dm[S.streets[a]]||0)-(dm[S.streets[b]]||0));
+  const pad=24, top=56, cols=14, cw=(W-pad*2-6)/cols, ch=Math.min(cw*0.86,(H-top-60)/Math.max(1,Math.ceil(order.length/cols)));
+  const maxAbs=Math.max(1, ...order.map(si=>Math.abs(S.byStreet[si].cur[1]-S.byStreet[si].pre[1])));
+  ctx.fillStyle='#e6eefc'; ctx.font='600 16px "Microsoft YaHei"';
+  ctx.fillText('⑤ 街道阵列：每格一个街道（按距本院距离排序），格内＝期初/期末构成条', pad, 28);
+  ctx.fillStyle='#7f93b5'; ctx.font='11.5px "Microsoft YaHei"';
+  ctx.fillText('边框＝净增（青绿）／净减（红）；点格子进入该街道个体级钻取', pad, 46);
+  S.tileHit=[];
+  order.forEach((si,k)=>{
+    const r=Math.floor(k/cols), c=k%cols;
+    const x=pad+c*(cw+ (W-pad*2-cols*cw)/(cols-1||1)), y=top+r*(ch+6);
+    const b=S.byStreet[si], n=b.n||1, net=b.cur[1]-b.pre[1];
+    ctx.fillStyle='rgba(13,20,36,.8)'; roundRect(x,y,cw,ch,5); ctx.fill();
+    ctx.strokeStyle = net>0 ? 'rgba(0,229,200,'+(0.35+0.65*Math.abs(net)/maxAbs)+')'
+                    : (net<0 ? 'rgba(255,107,107,'+(0.35+0.65*Math.abs(net)/maxAbs)+')' : '#1e2b45');
+    ctx.lineWidth= net!==0 ? 1.6 : 1; ctx.stroke();
+    stackedBar(x+4, y+ch*0.24, cw-8, 6, b.pre, n);
+    stackedBar(x+4, y+ch*0.52, cw-8, 6, b.cur, n);
+    ctx.fillStyle='#8ba0c4'; ctx.font='9.5px "Microsoft YaHei"';
+    ctx.fillText(S.streets[si].slice(0,5), x+5, y+ch-6);
+    ctx.fillStyle = net>0 ? C.self : (net<0 ? '#ff6b6b' : '#5f7191');
+    ctx.font='600 10px "Microsoft YaHei"';
+    ctx.fillText((net>0?'+':'')+net, x+cw-20, y+ch*0.2);
+    S.tileHit.push({x,y,w:cw,h:ch,si});
+  });
+}
+/* ───────── ⑥ 迁移流（桑基式流带） ───────── */
+function ribbon(x0,y0,x1,y1,c,t0,t1,alpha){
+  const g=(t1-t0), my=(y0+y1)/2;
+  const p=[x0,y0,x0+ (x1-x0)*0.45, y0, x1-(x1-x0)*0.45, y1, x1, y1];
+  ctx.beginPath();
+  ctx.moveTo(x0, y0); ctx.bezierCurveTo(p[2],p[3],p[4],p[5],x1,y1);
+  ctx.strokeStyle=c; ctx.lineWidth=Math.max(2,g); ctx.globalAlpha=alpha; ctx.stroke(); ctx.globalAlpha=1;
+}
+function drawFlow(){
+  ctx.clearRect(0,0,W,H);
+  if(!S.agents.length){ drawSplash(); return; }
+  const mx=migMatrix();
+  const preSelf=mx[1][0]+mx[1][1]+mx[1][2], postSelf=mx[0][1]+mx[1][1]+mx[2][1];
+  const fromOut=mx[0][1], fromComp=mx[2][1], toOut=mx[1][0], toComp=mx[1][2];
+  ctx.fillStyle='#e6eefc'; ctx.font='600 16px "Microsoft YaHei"';
+  ctx.fillText('⑥ 迁移流：期初 → 期末，人群在三态之间的实际流动（流带宽度＝人数）', 24, 28);
+  ctx.fillStyle='#7f93b5'; ctx.font='11.5px "Microsoft YaHei"';
+  ctx.fillText('口径：个体级选择序列的前后对比（同一个体前后同号），不是模型推算', 24, 46);
+  const pad=60, top=80, height=H-top-70;
+  const lx=pad, rx=W-pad-160, bw=140;
+  // 左：两个源块（未就诊 / 竞争）
+  const srcTotal=fromOut+toOut+fromComp+toComp+1;
+  const blocks=[
+    {name:'未就诊 → 我院', n:fromOut, col:C.self, y:top},
+    {name:'竞争 → 我院', n:fromComp, col:C.self, y:top+height*0.42},
+    {name:'我院 → 竞争（流失）', n:toComp, col:'#ff6b6b', y:top+height*0.72},
+    {name:'我院 → 未就诊（流失）', n:toOut, col:'#ff6b6b', y:top+height*0.88},
+  ];
+  const maxN=Math.max(1, ...blocks.map(b=>b.n));
+  blocks.forEach(b=>{
+    const bwid=Math.max(3, b.n/maxN*46);
+    ribbon(lx+bw, b.y, rx, top+height*0.42, b.col, 0, bwid, 0.45);
+    ctx.fillStyle='rgba(13,20,36,.85)'; roundRect(lx, b.y-bwid/2, bw, bwid+10, 4); ctx.fill();
+    ctx.fillStyle=b.col; ctx.font='600 12px "Microsoft YaHei"';
+    ctx.fillText(b.name, lx+bw*0.55, b.y-bwid/2-6);
+    ctx.font='700 14px "Microsoft YaHei"'; ctx.fillText(' ' + b.n, lx+bw*0.55+ctx.measureText(b.name).width+6, b.y-bwid/2-6);
+  });
+  // 右：我院两块（期初 / 期末）
+  const y1=top+height*0.22, y2=top+height*0.42;
+  [[preSelf,'期初 我院',y1],[postSelf,'期末 我院',y2]].forEach(([n,lab,y])=>{
+    const hh=Math.max(10, n/maxN*60);
+    ctx.fillStyle='rgba(0,229,200,.16)'; ctx.strokeStyle=C.self;
+    roundRect(rx, y-hh/2, bw, hh, 6); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#e6eefc'; ctx.font='600 13px "Microsoft YaHei"';
+    ctx.fillText(lab + ' ' + n, rx+10, y+4);
+  });
+  ctx.fillStyle='#7f93b5'; ctx.font='12px "Microsoft YaHei"';
+  ctx.fillText('净变化：' + (postSelf-preSelf>=0?'+':'') + (postSelf-preSelf) + ' 人 ｜ 期末份额 '
+    + (postSelf/(S.agents.length||1)*100).toFixed(1) + '% ｜ 反向流失 ' + (toOut+toComp) + ' 人（诚实地画出来）', 24, H-22);
+}
+/* ───────── ⑨ 份额转移瀑布 ───────── */
+function drawWaterfall(){
+  ctx.clearRect(0,0,W,H);
+  if(!S.agents.length){ drawSplash(); return; }
+  const mx=migMatrix(), tot=S.agents.length||1;
+  const preSelf=mx[1][0]+mx[1][1]+mx[1][2], postSelf=mx[0][1]+mx[1][1]+mx[2][1];
+  const steps=[
+    {lab:'期初我院', v:preSelf, type:'base'},
+    {lab:'竞争医院转来', v:mx[2][1], type:'up'},
+    {lab:'未就诊激活', v:mx[0][1], type:'up'},
+    {lab:'流失到竞争', v:-mx[1][2], type:'down'},
+    {lab:'流失到未就诊', v:-mx[1][0], type:'down'},
+    {lab:'期末我院', v:postSelf, type:'total'},
+  ];
+  ctx.fillStyle='#e6eefc'; ctx.font='600 16px "Microsoft YaHei"';
+  ctx.fillText('⑨ 份额转移瀑布：从期初到期末，我院人数是怎么变的（每一步都可核对）', 26, 30);
+  ctx.fillStyle='#7f93b5'; ctx.font='11.5px "Microsoft YaHei"';
+  ctx.fillText('恒等式：期初 + 转来 − 流失 = 期末（个体级选择计数，逐位可复算）', 26, 48);
+  const pad=70, top=100, w=W-pad-120, h=H-top-140;
+  const maxV=Math.max(preSelf, postSelf, ...steps.map(s=>Math.abs(s.v)))*1.25 || 1;
+  const cw=w/steps.length;
+  let cum=0;
+  steps.forEach((s,i)=>{
+    const x=pad+i*cw+cw*0.14, bwid=cw*0.72;
+    let y, hh;
+    if(s.type==='base'){ cum=s.v; hh=h*s.v/maxV; y=top+h-hh; }
+    else if(s.type==='total'){ hh=h*s.v/maxV; y=top+h-hh; }
+    else if(s.type==='up'){ hh=h*Math.abs(s.v)/maxV; y=top+h-h*(cum/maxV)-hh; }
+    else { hh=h*Math.abs(s.v)/maxV; y=top+h-h*((cum+s.v)/maxV); }
+    const col = s.type==='base'||s.type==='total' ? C.self : (s.type==='up' ? '#3ddc97' : '#ff6b6b');
+    ctx.fillStyle=col; ctx.globalAlpha=0.85; ctx.fillRect(x,y,bwid,hh); ctx.globalAlpha=1;
+    ctx.strokeStyle='#0b1220'; ctx.lineWidth=1; ctx.strokeRect(x,y,bwid,hh);
+    if(s.type!=='base') cum += s.v;
+    ctx.fillStyle='#e6eefc'; ctx.font='600 13px "Microsoft YaHei"';
+    ctx.fillText((s.v>0&&s.type!=='base'&&s.type!=='total'?'+':'') + s.v, x+bwid/2-14, y-8);
+    ctx.fillStyle='#8ba0c4'; ctx.font='11.5px "Microsoft YaHei"';
+    ctx.fillText(s.lab, x, top+h+22);
+    ctx.fillStyle='#5f7191'; ctx.font='11px "Microsoft YaHei"';
+    ctx.fillText('份额 ' + (Math.abs(s.type==='base'||s.type==='total' ? s.v : s.v)/tot*100).toFixed(1) + '%', x, top+h+40);
+  });
+  ctx.fillStyle='#8ba0c4'; ctx.font='12.5px "Microsoft YaHei"';
+  ctx.fillText('期末份额 ' + (postSelf/tot*100).toFixed(1) + '%（期初 ' + (preSelf/tot*100).toFixed(1) + '%）'
+    + ' ｜ ⚠ 真实渗透率为个位数百分比，因此人数级瀑布变化很小；讲"引力增强"请看期望概率口径（结合总量人次）', pad, H-24);
+}
+
+/* ───────── 交互 ───────── */
+function setYear(t, redraw){
+  if(!S.meta) return;                                  // 未运行时（启动序列）直接忽略
+  S.year=Math.max(0,Math.min(S.meta.years.length-1,t));
+  document.querySelectorAll('#years button').forEach(b=>b.classList.toggle('on', +b.dataset.t===S.year));
+  layout(); updBadge();
+  if(S.view==='map'){ drawMapStreets(); drawMapAgents(); wave(); } else { redrawView(); }
+  renderStreets();
+}
+const REDRAW={migrate:()=>draw(), compare:()=>drawCompare(), band:()=>drawBand(), tile:()=>drawTile(),
+              flow:()=>drawFlow(), waterfall:()=>drawWaterfall(), drill:()=>drawDrill()};
+function redrawView(){ const f=REDRAW[S.view]; if(f) f(); }
+function switchView(v){
+  S.view=v;
+  document.querySelectorAll('.view').forEach(b=>b.classList.toggle('on', b.dataset.v===v));
+  $('map').style.display = v==='map'?'block':'none';
+  cv.style.display = (v==='map')?'none':'block';
+  $('streetBox').style.display = (v==='streets'||v==='drill')?'block':'none';
+  const notes={migrate:'① 三块人群方阵：看「人往我院流」的整体迁徙',
+    map:'② 地图波前：青绿波前从三医向外扩散，波扫过的街道按我院占比着色（地图可独立缩放/平移/双击复位）',
+    compare:'③ 双蜂群对比：同一批个体在期初与期末的并排对照 + 迁移矩阵（前后同号同人）',
+    band:'④ 分带明细：按距本院距离分 5 带，看每一带的构成变化与净转来',
+    tile:'⑤ 街道阵列：134 格按距离排序，格=街道（期初/期末构成条），点格进钻取',
+    flow:'⑥ 迁移流：未就诊/竞争 → 我院 的流带（宽度=人数），反向流失也如实画出',
+    streets:'⑦ 街道构成：134 个街道的期初→期末构成条与变动排序，点行进入钻取',
+    drill:'⑧ 单街道钻取：看该街道每一个体，按科室分组（颜色=当年选择）',
+    waterfall:'⑨ 份额瀑布：期初 + 转来 − 流失 = 期末 的逐步分解（可逐位核对）'};
+  $('viewNote').textContent = notes[v]||'';
+  if(v==='map'){ initMap();
+    setTimeout(()=>{ if(S.map) S.map.resize(); drawMapStreets(); drawMapAgents(); }, 80);
+    setTimeout(()=>{ if(S.map) S.map.resize(); drawMapStreets(); drawMapAgents(); wave(); }, 900); }
+  setYear(S.year,true);
+}
+document.querySelectorAll('.view').forEach(b=>b.onclick=()=>switchView(b.dataset.v));
+document.querySelectorAll('.cmode').forEach(b=>b.onclick=()=>{ setCMode(b.dataset.c); });
+function setCMode(c){
+  S.cmode=c;
+  document.querySelectorAll('.cmode').forEach(b=>b.classList.toggle('on', b.dataset.c===c));
+  $('cmodeNote').innerHTML = (c==='prob')
+    ? `按<b>期望概率</b>着色（灰→青绿＝个体选择我院的概率，逐年由后端给出）：真实渗透率是个位数，
+       <b>抽样选择</b>下人数几乎不动，而概率在逐年上升——讲"引力增强"用这个口径。`
+    : `按<b>抽样选择</b>着色（离散三色）：人数随蒙卡抽样波动，真实渗透率（个位数）下看不出"整块迁徙"。`;
+  updBadge(); if(S.view==='map') drawMapAgents(); else redrawView();
+}
+setCMode('prob');
+$('btnRun').onclick = runSim;
+$('fMag').oninput = e => $('fMagV').textContent = e.target.value+'%';
+$('fFocus').onchange = e => { S.focus=e.target.checked; refreshFocus();
+  if(S.view==='map') drawMapAgents(); else redrawView(); };
+let thTimer=null;
+$('fTh').oninput = e => { const v=+e.target.value/1000; S.th=v; $('fThV').textContent=v.toFixed(3);
+  clearTimeout(thTimer); thTimer=setTimeout(()=>{                       // 300ms 防抖（设计 §11）
+    S.affected=S.agents.filter(x=>x.d>=S.th).map(x=>x.i);
+    S.affectedSet=new Set(S.affected); refreshFocus();
+    if(S.view==='map') drawMapAgents(); else redrawView(); },300); };
+$('btnPlay').onclick = () => { S.playing=!S.playing; $('btnPlay').textContent=S.playing?'⏸ 暂停':'▶ 播放';
+  if(S.playing) play(); };
+function play(){ if(!S.playing) return;
+  const t=(S.year+1)%S.meta.years.length;
+  setYear(t,true); setTimeout(play, 1400); }
+cv.addEventListener('click', e=>{
+  if(!S.agents.length) return;
+  const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  if(S.view==='drill' && S.backHit && mx>=S.backHit.x && mx<=S.backHit.x+S.backHit.w &&
+     my>=S.backHit.y && my<=S.backHit.y+S.backHit.h){ S.drillSi=null; drawDrill(); return; }
+  if(S.view==='tile' && S.tileHit){
+    const hit=S.tileHit.find(h=>mx>=h.x && mx<=h.x+h.w && my>=h.y && my<=h.y+h.h);
+    if(hit){ S.drillSi=hit.si; switchView('drill'); }
+    return;
+  }
+  let best=null, bd=1e9;
+  for(const a of S.agents){ const p=S.slot[a.i]; if(!p) continue;
+    if(S.view==='drill'){ const b=S.byStreet[S.drillSi]; if(a.si!==S.drillSi) continue; }
+    const d2=(p.x-mx)**2+(p.y-my)**2; if(d2<bd){ bd=d2; best=a; } }
+  if(S.view==='drill'){ // 钻取视图用网格重算：直接按最近点找
+    const b=S.byStreet[S.drillSi]; if(b){
+      // 网格坐标与 drawDrill 一致
+      const ids=S.agents.filter(a=>a.si===S.drillSi); const groups={};
+      ids.forEach(a=>{ const d=S.data.dept_table[a.di]; (groups[d]=groups[d]||[]).push(a); });
+      const keys=Object.keys(groups).sort((x,y)=>groups[y].length-groups[x].length);
+      const gw=(W-72)/keys.length; let bb=null, bdd=1e9;
+      keys.forEach((k,gi)=>{ const g=groups[k], x0=24+gi*gw;
+        const cols=Math.ceil(Math.sqrt(g.length*1.6)); const dxs=gw/cols;
+        g.forEach((a,i)=>{ const cx=x0+(i%cols)*dxs+6, cy=110+Math.floor(i/cols)*13;
+          const d2=(cx-mx)**2+(cy-my)**2; if(d2<bdd){ bdd=d2; bb=a; } }); });
+      if(bb) showAgent(bb.i);
+    }
+    return;
+  }
+  if(best && bd<400) showAgent(best.i);
+});
+if(S.map===null){ /* 地图懒加载，切到 ② 时初始化 */ }
+window.addEventListener('resize', ()=>{ if(S.view==='map'&&S.map) S.map.resize(); resize(); });
+window.addEventListener('error', e => { window.__lastErr = (e && e.message) || 'unknown'; });   // 诊断钩子
+/* 启动序列：钩子先挂（验收/脚本要用），再跑启动；启动失败也把原因留在 window.__bootErr */
+window.__swarm = {S, runSim, setYear, switchView, showAgent, draw, boot: null};   // 程序化验收钩子
+function boot(){
+  window.__boot.t++;
+  try{ fillDepts(DEFAULT_DEPTS); resize(); switchView('migrate'); drawSplash(); }
+  catch(e){ window.__boot.err = String((e && e.stack) || e); window.__bootErr = window.__boot.err; }
+}
+window.__swarm.boot = boot;
+boot();
+document.addEventListener('DOMContentLoaded', boot);
+</script>
+</body>
+</html>
